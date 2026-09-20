@@ -1,3 +1,8 @@
+# Case-level data — never commit
+Case_data.csv
+*.csv
+*.xlsx
+
 # History files
 .Rhistory
 .Rapp.history
