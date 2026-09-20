@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reported Cases by County and Condition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  :root {
+    --bar:        #c98a93;
+    --suppressed: #d9a441;
+    --none:       #9ca3af;
+    --ink:        #1f2a30;
+    --muted:      #6c7a89;
+    --line:       #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 16px;
+    font-family: Inter, "Segoe UI", Verdana, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, #f6f8f9 0%, #eaf0f1 100%);
+    min-height: 100vh;
+  }
+  .app-title {
+    padding: 18px 24px;
+    margin-bottom: 18px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  }
+  .app-title h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .layout {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .sidebar {
+    flex: 0 0 280px;
+    background: #fff;
+    border-radius: 0.9rem;
+    padding: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .plot-card {
+    flex: 1 1 520px;
+    background: #fff;
+    border-radius: 0.9rem;
+    padding: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #4a4d57;
+    margin-bottom: 6px;
+  }
+  select {
+    width: 100%;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 0.92rem;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.5rem;
+  }
+  select:focus-visible {
+    outline: 2px solid var(--bar);
+    outline-offset: 1px;
+  }
+  select:disabled {
+    background: #f2f4f5;
+    color: var(--muted);
+  }
+  .field { margin-bottom: 18px; }
+  .note {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  #scopeNote {
+    margin-top: 8px;
+    padding-left: 10px;
+    border-left: 3px solid var(--suppressed);
+  }
+  #scopeNote[hidden] { display: none; }
+  .footnote { margin-top: 14px; }
+  @media (max-width: 640px) {
+    .sidebar { flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-title">
+  <h1>Number of Cases Reported by County and Condition</h1>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="field">
+      <label for="condition">Select condition</label>
+      <select id="condition"></select>
+    </div>
+
+    <div class="field">
+      <label for="county">Select county</label>
+      <select id="county"></select>
+      <p class="note" id="scopeNote" hidden></p>
+    </div>
+
+    <p class="note footnote" id="footnote"></p>
+  </div>
+
+  <div class="plot-card">
+    <div id="chart" style="height:480px;"></div>
+  </div>
+</div>
+
+<script>
+const PAYLOAD = /*__DATA__*/;
+
+const COL = {
+  bar: "#c98a93", suppressed: "#d9a441", none: "#9ca3af",
+  ink: "#1f2a30", grid: "#e7e7ea", axis: "#5b7480"
+};
+const FONT = 'Inter, Verdana, sans-serif';
+
+const conditionSel = document.getElementById("condition");
+const countySel    = document.getElementById("county");
+const scopeNote    = document.getElementById("scopeNote");
+
+const RARE = new Set(PAYLOAD.rare || []);
+
+function addOptions(parent, values) {
+  values.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = v;
+    parent.appendChild(o);
+  });
+}
+
+function addGroup(sel, label, values) {
+  if (!values.length) return;
+  const g = document.createElement("optgroup");
+  g.label = label;
+  addOptions(g, values);
+  sel.appendChild(g);
+}
+
+// Conditions that never reach the reporting threshold in any county go in a
+// second group, so the common ones stay at the top of the list.
+const common = PAYLOAD.conditions.filter(c => !RARE.has(c));
+const rare   = PAYLOAD.conditions.filter(c =>  RARE.has(c));
+
+if (rare.length) {
+  addGroup(conditionSel, "Regularly reported", common);
+  addGroup(conditionSel, "Rarely reported", rare);
+} else {
+  addOptions(conditionSel, PAYLOAD.conditions);
+}
+
+addOptions(countySel, PAYLOAD.counties);
+document.getElementById("footnote").textContent = PAYLOAD.footnote;
+
+// Opening view, before anyone touches the dropdowns.
+function selectIfPresent(sel, value) {
+  if (!value) return;
+  const hit = Array.from(sel.options).find(o => o.value === value);
+  if (hit) sel.value = value;
+}
+selectIfPresent(conditionSel, PAYLOAD.defaultCondition);
+selectIfPresent(countySel, PAYLOAD.defaultCounty);
+
+// Allow ?condition=...&county=... so an ArcGIS Embed widget can drive the view.
+const params = new URLSearchParams(window.location.search);
+[["condition", conditionSel], ["county", countySel]].forEach(([key, sel]) => {
+  const want = params.get(key);
+  if (!want) return;
+  const hit = Array.from(sel.options)
+    .find(o => o.value.toLowerCase() === want.toLowerCase());
+  if (hit) sel.value = hit.value;
+});
+
+function draw() {
+  const condition  = conditionSel.value;
+  const isRare     = RARE.has(condition);
+  const geography  = isRare ? PAYLOAD.districtLabel : countySel.value;
+
+  // A rare condition has no county breakdown to offer.
+  countySel.disabled = isRare;
+  scopeNote.hidden = !isRare;
+  if (isRare) scopeNote.textContent = PAYLOAD.rareNote;
+
+  const years  = PAYLOAD.years;
+  const values = PAYLOAD.series[condition + "||" + geography]
+                 || years.map(() => "0");
+
+  const barX = [], barY = [], barText = [];
+  const supX = [], noneX = [];
+
+  values.forEach((v, i) => {
+    if (v === "<5") {
+      supX.push(years[i]);
+    } else if (Number(v) === 0) {
+      noneX.push(years[i]);
+    } else {
+      barX.push(years[i]);
+      barY.push(Number(v));
+      barText.push("Number of cases: " + v);
+    }
+  });
+
+  const maxVal = barY.length ? Math.max(...barY) : 0;
+  const allSuppressed = barY.length === 0;
+
+  const traces = [
+    {
+      type: "bar", x: barX, y: barY,
+      marker: { color: COL.bar }, width: 0.6,
+      textposition: "none",
+      hovertext: barText,
+      hovertemplate: "%{hovertext}<extra></extra>"
+    },
+    {
+      type: "scatter", mode: "markers+text",
+      x: supX, y: supX.map(() => 0.4),
+      marker: { color: COL.suppressed, size: 9 },
+      text: supX.map(() => "<5"),
+      textposition: "top center",
+      textfont: { color: COL.suppressed, size: 10, family: FONT },
+      hovertemplate:
+        "Fewer than 5 cases reported (count suppressed for privacy)<extra></extra>"
+    },
+    {
+      type: "scatter", mode: "markers",
+      x: noneX, y: noneX.map(() => 0.4),
+      marker: { color: COL.none, size: 9 },
+      hovertemplate: "No cases reported<extra></extra>"
+    }
+  ];
+
+  const layout = {
+    title: {
+      text: "Number of cases reported in " + geography + " for " + condition,
+      font: { size: 13, family: FONT, color: COL.ink },
+      x: 0.02, xanchor: "left"
+    },
+    showlegend: false,
+    paper_bgcolor: "#fff",
+    plot_bgcolor: "#fff",
+    margin: { t: 50, r: 20, l: 60, b: 110 },
+    font: { family: FONT, color: COL.ink },
+    bargap: 0.4,
+    xaxis: {
+      type: "category",
+      categoryorder: "array",
+      categoryarray: years,
+      showgrid: false,
+      tickfont: { size: 11, color: COL.ink },
+      fixedrange: true
+    },
+    yaxis: {
+      title: { text: "Number of cases reported", font: { size: 11 } },
+      range: [0, Math.max(maxVal + 1, 2)],
+      showticklabels: !allSuppressed,
+      showgrid: true,
+      gridcolor: COL.grid,
+      gridwidth: 0.6,
+      tickfont: { size: 11, color: COL.axis },
+      zeroline: false,
+      fixedrange: true
+    },
+    annotations: [
+      {
+        x: 0.49, y: -0.17, xref: "paper", yref: "paper",
+        xanchor: "right", showarrow: false,
+        text: "<b>\u25CF  Fewer than 5 cases (suppressed)</b>",
+        font: { size: 12, color: COL.suppressed, family: FONT }
+      },
+      {
+        x: 0.51, y: -0.17, xref: "paper", yref: "paper",
+        xanchor: "left", showarrow: false,
+        text: "<b>\u25CF  No cases reported</b>",
+        font: { size: 12, color: COL.none, family: FONT }
+      },
+      {
+        x: 0.5, y: -0.26, xref: "paper", yref: "paper",
+        showarrow: false,
+        text: PAYLOAD.footnote,
+        font: { size: 10, color: "#6c7a89", family: FONT }
+      }
+    ]
+  };
+
+  Plotly.react("chart", traces, layout, {
+    displayModeBar: false,
+    responsive: true
+  });
+}
+
+conditionSel.addEventListener("change", draw);
+countySel.addEventListener("change", draw);
+draw();
+</script>
+</body>
+</html>

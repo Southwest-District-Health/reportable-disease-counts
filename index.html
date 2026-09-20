@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reported Cases by County and Condition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  :root {
+    --bar:        #c98a93;
+    --suppressed: #d9a441;
+    --none:       #9ca3af;
+    --ink:        #1f2a30;
+    --muted:      #6c7a89;
+    --line:       #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 16px;
+    font-family: Inter, "Segoe UI", Verdana, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, #f6f8f9 0%, #eaf0f1 100%);
+    min-height: 100vh;
+  }
+  .app-title {
+    padding: 18px 24px;
+    margin-bottom: 18px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  }
+  .app-title h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .layout {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .sidebar {
+    flex: 0 0 280px;
+    background: #fff;
+    border-radius: 0.9rem;
+    padding: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .plot-card {
+    flex: 1 1 520px;
+    background: #fff;
+    border-radius: 0.9rem;
+    padding: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #4a4d57;
+    margin-bottom: 6px;
+  }
+  select {
+    width: 100%;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 0.92rem;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.5rem;
+  }
+  select:focus-visible {
+    outline: 2px solid var(--bar);
+    outline-offset: 1px;
+  }
+  select:disabled {
+    background: #f2f4f5;
+    color: var(--muted);
+  }
+  .field { margin-bottom: 18px; }
+  .note {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  #scopeNote {
+    margin-top: 8px;
+    padding-left: 10px;
+    border-left: 3px solid var(--suppressed);
+  }
+  #scopeNote[hidden] { display: none; }
+  .footnote { margin-top: 14px; }
+  @media (max-width: 640px) {
+    .sidebar { flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-title">
+  <h1>Number of Cases Reported by County and Condition</h1>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="field">
+      <label for="condition">Select condition</label>
+      <select id="condition"></select>
+    </div>
+
+    <div class="field">
+      <label for="county">Select county</label>
+      <select id="county"></select>
+      <p class="note" id="scopeNote" hidden></p>
+    </div>
+
+    <p class="note footnote" id="footnote"></p>
+  </div>
+
+  <div class="plot-card">
+    <div id="chart" style="height:480px;"></div>
+  </div>
+</div>
+
+<script>
+const PAYLOAD = {"years":["2018","2019","2020","2021","2022","2023","2024","2025","2026*"],"conditions":["Acute flaccid myelitis","AIDS","Botulism, infant","Campylobacteriosis","Chlamydia trachomatis infection","Cryptosporidiosis","Dengue","Elevated Blood Lead","Giardiasis","Gonorrhea","Group A Streptococcus, invasive","Haemophilus influenzae, invasive","Hantavirus pulmonary syndrome","Hepatitis A, acute","Hepatitis B virus infection, Chronic","Hepatitis B, acute","Hepatitis C, Acute","Hepatitis C, chronic","Hepatitis C, perinatal infection","HIV","Legionellosis","Leptospirosis","Listeriosis","Lyme disease","Malaria","Measles (Rubeola)","Monkeypox","Mumps","Neisseria meningitidis, invasive (Mening. disease)","Noroviruses","Pertussis","Pneumocystis pneumonia (PCP)","Q fever, Acute","Q fever, Chronic","Rabies PEP","Rabies, animal","Relapsing Fever (tick and louse-borne)","Respiratory syncytial virus (RSV)","S. aureus, coag+, meth- or oxi- resistant (MRSA)","Salmonella Paratyphi (A, B, and C)","Salmonella Typhi (S. Typhi)","Salmonellosis","Shiga toxin-producing Escherichia coli (STEC)","Shigellosis","Spotted Fever Rickettsiosis","Streptococcus pneumoniae, invasive disease (IPD)","Syphilis, congenital","Syphilis, early non-primary, non-secondary","Syphilis, primary","Syphilis, secondary","Syphilis, unknown duration or late","Toxic-shock syndrome,staphylococcal","Transmissible spongiform encephalopathies (TSEs)","Tuberculosis","Tularemia","Vibrio parahaemolyticus","West Nile virus neuroinvasive disease","West Nile virus non-neuroinvasive disease","Yersiniosis (non-pestis)","Zika virus disease, non-congenital"],"counties":["Adams County","Canyon County","Gem County","Owyhee County","Payette County","Washington County"],"rare":["Acute flaccid myelitis","Botulism, infant","Dengue","Hantavirus pulmonary syndrome","Hepatitis B, acute","Hepatitis C, Acute","Hepatitis C, perinatal infection","Leptospirosis","Listeriosis","Lyme disease","Malaria","Monkeypox","Mumps","Neisseria meningitidis, invasive (Mening. disease)","Q fever, Acute","Q fever, Chronic","Rabies, animal","Relapsing Fever (tick and louse-borne)","Salmonella Paratyphi (A, B, and C)","Salmonella Typhi (S. Typhi)","Spotted Fever Rickettsiosis","Streptococcus pneumoniae, invasive disease (IPD)","Syphilis, congenital","Toxic-shock syndrome,staphylococcal","Transmissible spongiform encephalopathies (TSEs)","Tularemia","Vibrio parahaemolyticus","West Nile virus non-neuroinvasive disease","Zika virus disease, non-congenital"],"districtLabel":"Health District 3","defaultCondition":"Campylobacteriosis","defaultCounty":"Canyon County","rareNote":"Shown for Health District 3 as a whole. County-level counts are not published for conditions this uncommon.","footnote":"*2026 data as of 06/30/2026. 2026 data is provisional and may be subject to change.","series":{"AIDS||Adams County":["0","0","0","0","0","0","0","0","0"],"AIDS||Canyon County":["<5","6","<5","<5","<5","<5","<5","0","<5"],"AIDS||Gem County":["0","<5","0","0","0","<5","0","0","0"],"AIDS||Owyhee County":["0","0","0","0","0","<5","0","0","0"],"AIDS||Payette County":["<5","<5","0","0","0","0","0","0","0"],"AIDS||Washington County":["0","0","0","0","0","0","0","0","0"],"Acute flaccid myelitis||Health District 3":["0","0","0","0","<5","0","0","0","0"],"Botulism, infant||Health District 3":["<5","0","<5","<5","0","0","0","0","0"],"Campylobacteriosis||Adams County":["<5","<5","0","0","<5","<5","<5","<5","<5"],"Campylobacteriosis||Canyon County":["71","71","56","70","88","90","131","112","53"],"Campylobacteriosis||Gem County":["9","5","5","6","<5","5","8","7","5"],"Campylobacteriosis||Owyhee County":["<5","9","<5","9","12","7","13","8","<5"],"Campylobacteriosis||Payette County":["15","10","6","12","10","7","10","12","<5"],"Campylobacteriosis||Washington County":["0","8","<5","<5","<5","<5","<5","<5","<5"],"Chlamydia trachomatis infection||Adams County":["9","<5","<5","9","7","11","<5","<5","<5"],"Chlamydia trachomatis infection||Canyon County":["1195","1333","1196","1035","980","901","908","878","364"],"Chlamydia trachomatis infection||Gem County":["46","68","47","36","23","38","28","23","19"],"Chlamydia trachomatis infection||Owyhee County":["58","54","50","25","26","21","41","30","14"],"Chlamydia trachomatis infection||Payette County":["92","81","77","45","53","47","70","52","28"],"Chlamydia trachomatis infection||Washington County":["35","18","30","28","24","23","21","18","7"],"Cryptosporidiosis||Adams County":["0","<5","0","0","0","<5","0","0","0"],"Cryptosporidiosis||Canyon County":["22","6","11","<5","<5","10","<5","5","<5"],"Cryptosporidiosis||Gem County":["0","0","<5","<5","0","0","<5","0","0"],"Cryptosporidiosis||Owyhee County":["<5","0","0","0","0","0","0","0","<5"],"Cryptosporidiosis||Payette County":["<5","5","0","6","<5","<5","<5","<5","0"],"Cryptosporidiosis||Washington County":["<5","<5","0","0","<5","0","<5","<5","0"],"Dengue||Health District 3":["0","0","0","0","0","0","<5","<5","0"],"Elevated Blood Lead||Adams County":["0","0","0","0","0","0","0","0","0"],"Elevated Blood Lead||Canyon County":["<5","7","<5","<5","8","7","8","9","<5"],"Elevated Blood Lead||Gem County":["<5","<5","0","0","0","0","0","0","0"],"Elevated Blood Lead||Owyhee County":["<5","<5","<5","0","0","0","<5","<5","<5"],"Elevated Blood Lead||Payette County":["<5","<5","<5","0","<5","<5","<5","<5","<5"],"Elevated Blood Lead||Washington County":["0","0","0","0","<5","<5","0","0","0"],"Giardiasis||Adams County":["<5","0","0","0","<5","0","0","<5","0"],"Giardiasis||Canyon County":["14","15","9","22","10","14","8","19","6"],"Giardiasis||Gem County":["<5","<5","<5","<5","<5","0","<5","<5","<5"],"Giardiasis||Owyhee County":["0","<5","0","0","0","<5","<5","<5","0"],"Giardiasis||Payette County":["<5","0","<5","<5","<5","0","<5","<5","0"],"Giardiasis||Washington County":["0","0","0","<5","0","<5","<5","0","0"],"Gonorrhea||Adams County":["0","0","<5","<5","<5","0","0","0","0"],"Gonorrhea||Canyon County":["185","335","290","214","162","126","131","101","43"],"Gonorrhea||Gem County":["5","5","24","15","<5","<5","<5","0","<5"],"Gonorrhea||Owyhee County":["6","11","13","0","<5","<5","<5","0","0"],"Gonorrhea||Payette County":["16","<5","25","23","15","10","<5","7","<5"],"Gonorrhea||Washington County":["5","<5","6","9","<5","<5","<5","<5","<5"],"Group A Streptococcus, invasive||Adams County":["0","0","<5","0","0","0","0","<5","<5"],"Group A Streptococcus, invasive||Canyon County":["9","11","9","8","8","17","14","15","9"],"Group A Streptococcus, invasive||Gem County":["<5","0","0","<5","0","<5","0","0","<5"],"Group A Streptococcus, invasive||Owyhee County":["0","0","0","0","0","0","0","<5","0"],"Group A Streptococcus, invasive||Payette County":["<5","<5","0","<5","<5","<5","<5","<5","0"],"Group A Streptococcus, invasive||Washington County":["0","<5","0","<5","0","0","<5","<5","0"],"HIV||Adams County":["0","0","<5","0","0","0","0","0","0"],"HIV||Canyon County":["7","8","17","11","23","12","20","25","11"],"HIV||Gem County":["0","0","0","<5","<5","0","0","<5","0"],"HIV||Owyhee County":["0","0","<5","0","0","<5","0","0","0"],"HIV||Payette County":["0","<5","<5","<5","<5","<5","<5","0","0"],"HIV||Washington County":["0","0","0","<5","0","0","<5","0","0"],"Haemophilus influenzae, invasive||Adams County":["0","0","0","0","0","0","0","0","0"],"Haemophilus influenzae, invasive||Canyon County":["<5","6","<5","<5","<5","<5","<5","5","<5"],"Haemophilus influenzae, invasive||Gem County":["<5","0","0","<5","0","0","0","0","0"],"Haemophilus influenzae, invasive||Owyhee County":["0","0","0","<5","0","<5","0","<5","0"],"Haemophilus influenzae, invasive||Payette County":["<5","<5","0","0","0","0","0","<5","<5"],"Haemophilus influenzae, invasive||Washington County":["0","0","0","0","0","0","0","0","0"],"Hantavirus pulmonary syndrome||Health District 3":["0","<5","0","0","0","0","0","<5","0"],"Hepatitis A, acute||Adams County":["0","0","<5","0","0","0","0","0","0"],"Hepatitis A, acute||Canyon County":["0","13","5","<5","<5","<5","<5","0","<5"],"Hepatitis A, acute||Gem County":["0","0","0","0","0","0","0","0","0"],"Hepatitis A, acute||Owyhee County":["0","<5","<5","0","0","0","0","0","0"],"Hepatitis A, acute||Payette County":["0","<5","<5","0","<5","0","0","0","0"],"Hepatitis A, acute||Washington County":["0","0","<5","0","0","0","0","0","0"],"Hepatitis B virus infection, Chronic||Adams County":["<5","0","0","0","0","0","0","0","0"],"Hepatitis B virus infection, Chronic||Canyon County":["13","10","10","5","8","13","7","12","5"],"Hepatitis B virus infection, Chronic||Gem County":["0","0","0","0","<5","0","0","0","0"],"Hepatitis B virus infection, Chronic||Owyhee County":["0","<5","0","0","0","0","0","0","0"],"Hepatitis B virus infection, Chronic||Payette County":["0","0","<5","0","0","0","0","<5","<5"],"Hepatitis B virus infection, Chronic||Washington County":["0","<5","0","0","0","0","<5","0","0"],"Hepatitis B, acute||Health District 3":["<5","0","0","0","<5","0","0","<5","0"],"Hepatitis C, Acute||Health District 3":["<5","5","0","0","<5","<5","<5","<5","0"],"Hepatitis C, chronic||Adams County":["<5","<5","<5","5","<5","<5","<5","0","<5"],"Hepatitis C, chronic||Canyon County":["187","175","177","213","154","154","98","78","39"],"Hepatitis C, chronic||Gem County":["21","16","17","18","12","8","12","13","<5"],"Hepatitis C, chronic||Owyhee County":["7","7","<5","13","9","<5","<5","<5","<5"],"Hepatitis C, chronic||Payette County":["20","19","30","25","21","20","20","12","9"],"Hepatitis C, chronic||Washington County":["<5","<5","5","<5","8","<5","5","6","<5"],"Hepatitis C, perinatal infection||Health District 3":["0","0","0","0","0","0","0","0","<5"],"Legionellosis||Adams County":["0","<5","0","0","0","0","0","0","0"],"Legionellosis||Canyon County":["<5","5","<5","<5","<5","<5","<5","<5","<5"],"Legionellosis||Gem County":["0","0","0","0","0","0","0","0","0"],"Legionellosis||Owyhee County":["0","0","0","0","0","0","<5","0","0"],"Legionellosis||Payette County":["0","<5","0","0","0","<5","<5","0","<5"],"Legionellosis||Washington County":["0","0","0","0","0","0","0","0","0"],"Leptospirosis||Health District 3":["0","0","0","0","0","0","0","<5","0"],"Listeriosis||Health District 3":["<5","<5","0","0","0","0","<5","<5","<5"],"Lyme disease||Health District 3":["<5","0","0","0","0","0","<5","0","0"],"Malaria||Health District 3":["0","0","0","<5","<5","<5","<5","<5","0"],"Measles (Rubeola)||Adams County":["0","0","0","0","0","0","0","0","0"],"Measles (Rubeola)||Canyon County":["0","0","0","0","0","10","0","0","6"],"Measles (Rubeola)||Gem County":["0","0","0","0","0","0","0","0","0"],"Measles (Rubeola)||Owyhee County":["0","0","0","0","0","0","0","0","0"],"Measles (Rubeola)||Payette County":["0","0","0","0","0","0","0","0","0"],"Measles (Rubeola)||Washington County":["0","0","0","0","0","0","0","0","0"],"Monkeypox||Health District 3":["0","0","0","0","0","<5","0","0","<5"],"Mumps||Health District 3":["0","0","0","0","<5","<5","<5","0","0"],"Neisseria meningitidis, invasive (Mening. disease)||Health District 3":["<5","<5","0","0","0","0","0","<5","0"],"Noroviruses||Adams County":["0","0","0","0","0","<5","<5","0","0"],"Noroviruses||Canyon County":["17","18","6","58","20","14","54","52","28"],"Noroviruses||Gem County":["0","0","0","0","16","<5","<5","<5","5"],"Noroviruses||Owyhee County":["<5","0","0","<5","0","0","<5","<5","0"],"Noroviruses||Payette County":["0","<5","0","0","<5","0","<5","6","5"],"Noroviruses||Washington County":["<5","0","<5","0","0","0","0","<5","<5"],"Pertussis||Adams County":["8","<5","<5","0","0","0","0","<5","0"],"Pertussis||Canyon County":["153","63","69","<5","<5","<5","232","184","23"],"Pertussis||Gem County":["<5","<5","<5","0","0","0","5","7","5"],"Pertussis||Owyhee County":["5","10","<5","0","<5","0","7","<5","0"],"Pertussis||Payette County":["6","<5","6","0","0","0","12","10","0"],"Pertussis||Washington County":["7","<5","0","0","0","0","<5","<5","0"],"Pneumocystis pneumonia (PCP)||Adams County":["0","<5","0","0","0","0","0","0","0"],"Pneumocystis pneumonia (PCP)||Canyon County":["<5","<5","<5","<5","<5","0","5","<5","0"],"Pneumocystis pneumonia (PCP)||Gem County":["0","0","0","0","0","0","0","0","0"],"Pneumocystis pneumonia (PCP)||Owyhee County":["0","0","0","0","0","0","0","0","0"],"Pneumocystis pneumonia (PCP)||Payette County":["0","<5","0","0","0","0","0","<5","0"],"Pneumocystis pneumonia (PCP)||Washington County":["0","0","0","0","0","0","0","<5","0"],"Q fever, Acute||Health District 3":["0","0","0","<5","<5","<5","0","0","0"],"Q fever, Chronic||Health District 3":["0","0","0","0","0","0","<5","0","0"],"Rabies PEP||Adams County":["0","0","0","0","<5","0","0","0","<5"],"Rabies PEP||Canyon County":["13","24","14","9","<5","6","11","14","<5"],"Rabies PEP||Gem County":["<5","<5","0","0","<5","<5","0","0","<5"],"Rabies PEP||Owyhee County":["0","<5","0","0","0","0","0","<5","0"],"Rabies PEP||Payette County":["0","<5","<5","<5","0","<5","<5","0","0"],"Rabies PEP||Washington County":["<5","0","<5","0","0","<5","<5","0","0"],"Rabies, animal||Health District 3":["0","<5","<5","<5","<5","<5","0","<5","0"],"Relapsing Fever (tick and louse-borne)||Health District 3":["0","0","<5","0","0","0","0","0","<5"],"Respiratory syncytial virus (RSV)||Adams County":["<5","5","<5","9","<5","<5","10","6","6"],"Respiratory syncytial virus (RSV)||Canyon County":["279","233","125","457","717","232","587","429","228"],"Respiratory syncytial virus (RSV)||Gem County":["11","13","<5","12","28","11","10","15","8"],"Respiratory syncytial virus (RSV)||Owyhee County":["7","7","7","13","25","8","25","9","9"],"Respiratory syncytial virus (RSV)||Payette County":["29","28","12","37","39","38","30","27","31"],"Respiratory syncytial virus (RSV)||Washington County":["<5","5","<5","8","<5","6","5","8","7"],"S. aureus, coag+, meth- or oxi- resistant (MRSA)||Adams County":["0","0","0","0","0","0","<5","<5","0"],"S. aureus, coag+, meth- or oxi- resistant (MRSA)||Canyon County":["14","16","10","9","15","81","74","29","17"],"S. aureus, coag+, meth- or oxi- resistant (MRSA)||Gem County":["<5","<5","0","<5","0","5","8","8","<5"],"S. aureus, coag+, meth- or oxi- resistant (MRSA)||Owyhee County":["<5","<5","<5","<5","0","<5","<5","<5","<5"],"S. aureus, coag+, meth- or oxi- resistant (MRSA)||Payette County":["<5","7","<5","<5","5","<5","9","5","<5"],"S. aureus, coag+, meth- or oxi- resistant (MRSA)||Washington County":["<5","0","<5","<5","0","5","<5","<5","<5"],"Salmonella Paratyphi (A, B, and C)||Health District 3":["0","0","0","<5","0","0","0","0","0"],"Salmonella Typhi (S. Typhi)||Health District 3":["0","0","0","0","0","<5","0","0","0"],"Salmonellosis||Adams County":["0","0","0","0","<5","<5","<5","<5","0"],"Salmonellosis||Canyon County":["30","19","28","15","21","42","23","33","24"],"Salmonellosis||Gem County":["<5","<5","<5","0","<5","<5","<5","<5","<5"],"Salmonellosis||Owyhee County":["<5","<5","0","<5","<5","<5","<5","0","<5"],"Salmonellosis||Payette County":["6","<5","5","<5","<5","<5","<5","<5","<5"],"Salmonellosis||Washington County":["<5","<5","<5","0","0","<5","<5","0","<5"],"Shiga toxin-producing Escherichia coli (STEC)||Adams County":["0","<5","<5","<5","<5","<5","0","<5","0"],"Shiga toxin-producing Escherichia coli (STEC)||Canyon County":["37","17","19","29","21","10","18","29","9"],"Shiga toxin-producing Escherichia coli (STEC)||Gem County":["5","<5","<5","<5","5","<5","<5","<5","<5"],"Shiga toxin-producing Escherichia coli (STEC)||Owyhee County":["<5","<5","<5","<5","<5","<5","<5","0","<5"],"Shiga toxin-producing Escherichia coli (STEC)||Payette County":["5","<5","<5","<5","7","<5","9","8","<5"],"Shiga toxin-producing Escherichia coli (STEC)||Washington County":["<5","0","<5","5","<5","<5","<5","<5","<5"],"Shigellosis||Adams County":["0","0","0","0","<5","0","0","0","0"],"Shigellosis||Canyon County":["17","7","<5","6","<5","<5","<5","5","<5"],"Shigellosis||Gem County":["0","0","0","0","0","0","<5","0","0"],"Shigellosis||Owyhee County":["<5","<5","0","0","0","0","<5","0","<5"],"Shigellosis||Payette County":["<5","0","0","0","<5","<5","<5","0","<5"],"Shigellosis||Washington County":["0","0","0","0","0","0","0","0","0"],"Spotted Fever Rickettsiosis||Health District 3":["5","0","0","0","0","0","0","0","0"],"Streptococcus pneumoniae, invasive disease (IPD)||Health District 3":["<5","<5","<5","<5","<5","<5","<5","<5","<5"],"Syphilis, congenital||Health District 3":["0","<5","0","<5","0","0","0","0","<5"],"Syphilis, early non-primary, non-secondary||Adams County":["0","0","0","0","0","0","0","0","0"],"Syphilis, early non-primary, non-secondary||Canyon County":["<5","<5","<5","12","12","7","<5","<5","0"],"Syphilis, early non-primary, non-secondary||Gem County":["0","<5","0","0","<5","0","0","0","0"],"Syphilis, early non-primary, non-secondary||Owyhee County":["0","0","0","0","0","0","0","0","0"],"Syphilis, early non-primary, non-secondary||Payette County":["0","0","<5","0","0","<5","0","0","0"],"Syphilis, early non-primary, non-secondary||Washington County":["0","0","0","0","0","<5","0","0","0"],"Syphilis, primary||Adams County":["0","0","0","0","0","0","0","0","0"],"Syphilis, primary||Canyon County":["<5","<5","12","24","24","<5","<5","<5","<5"],"Syphilis, primary||Gem County":["0","0","0","<5","0","0","0","0","0"],"Syphilis, primary||Owyhee County":["0","0","<5","0","0","0","0","0","0"],"Syphilis, primary||Payette County":["0","0","0","<5","<5","0","0","0","0"],"Syphilis, primary||Washington County":["0","0","0","0","0","0","<5","0","0"],"Syphilis, secondary||Adams County":["0","0","0","0","0","0","0","0","0"],"Syphilis, secondary||Canyon County":["<5","0","<5","<5","8","16","10","<5","<5"],"Syphilis, secondary||Gem County":["0","0","0","0","<5","0","0","0","<5"],"Syphilis, secondary||Owyhee County":["0","0","0","0","0","<5","0","0","0"],"Syphilis, secondary||Payette County":["0","0","0","<5","<5","0","<5","<5","0"],"Syphilis, secondary||Washington County":["0","0","0","0","0","0","0","0","0"],"Syphilis, unknown duration or late||Adams County":["0","0","0","0","0","0","0","0","0"],"Syphilis, unknown duration or late||Canyon County":["10","8","15","20","16","18","9","12","8"],"Syphilis, unknown duration or late||Gem County":["0","0","0","0","<5","<5","0","0","0"],"Syphilis, unknown duration or late||Owyhee County":["0","0","<5","0","<5","<5","0","0","<5"],"Syphilis, unknown duration or late||Payette County":["0","0","<5","0","<5","<5","<5","0","<5"],"Syphilis, unknown duration or late||Washington County":["0","0","<5","<5","0","0","0","0","0"],"Toxic-shock syndrome,staphylococcal||Health District 3":["0","0","0","0","0","0","<5","0","0"],"Transmissible spongiform encephalopathies (TSEs)||Health District 3":["<5","<5","0","0","0","<5","<5","<5","0"],"Tuberculosis||Adams County":["0","0","0","0","0","0","0","0","0"],"Tuberculosis||Canyon County":["<5","<5","0","0","0","<5","<5","6","<5"],"Tuberculosis||Gem County":["0","0","<5","0","0","<5","0","0","0"],"Tuberculosis||Owyhee County":["0","0","0","<5","0","0","<5","0","0"],"Tuberculosis||Payette County":["<5","0","0","0","0","0","0","<5","0"],"Tuberculosis||Washington County":["0","0","0","0","0","0","0","0","0"],"Tularemia||Health District 3":["0","0","0","<5","<5","<5","<5","0","0"],"Vibrio parahaemolyticus||Health District 3":["<5","0","0","0","0","0","0","0","0"],"West Nile virus neuroinvasive disease||Adams County":["0","0","0","<5","0","0","0","0","0"],"West Nile virus neuroinvasive disease||Canyon County":["<5","0","0","<5","<5","7","<5","0","0"],"West Nile virus neuroinvasive disease||Gem County":["0","0","<5","0","0","<5","<5","0","0"],"West Nile virus neuroinvasive disease||Owyhee County":["<5","<5","0","<5","0","<5","0","0","0"],"West Nile virus neuroinvasive disease||Payette County":["0","0","0","0","0","<5","0","0","0"],"West Nile virus neuroinvasive disease||Washington County":["<5","<5","0","<5","0","5","0","0","0"],"West Nile virus non-neuroinvasive disease||Health District 3":["<5","6","<5","<5","<5","<5","0","<5","0"],"Yersiniosis (non-pestis)||Adams County":["0","0","0","0","0","0","0","0","0"],"Yersiniosis (non-pestis)||Canyon County":["<5","<5","0","<5","<5","6","<5","<5","<5"],"Yersiniosis (non-pestis)||Gem County":["0","0","0","0","0","0","0","<5","0"],"Yersiniosis (non-pestis)||Owyhee County":["0","0","0","0","0","0","0","<5","0"],"Yersiniosis (non-pestis)||Payette County":["0","0","0","0","<5","0","0","<5","0"],"Yersiniosis (non-pestis)||Washington County":["0","0","<5","0","0","0","0","0","0"],"Zika virus disease, non-congenital||Health District 3":["0","<5","0","0","0","0","0","0","0"]}};
+
+const COL = {
+  bar: "#c98a93", suppressed: "#d9a441", none: "#9ca3af",
+  ink: "#1f2a30", grid: "#e7e7ea", axis: "#5b7480"
+};
+const FONT = 'Inter, Verdana, sans-serif';
+
+const conditionSel = document.getElementById("condition");
+const countySel    = document.getElementById("county");
+const scopeNote    = document.getElementById("scopeNote");
+
+const RARE = new Set(PAYLOAD.rare || []);
+
+function addOptions(parent, values) {
+  values.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = v;
+    parent.appendChild(o);
+  });
+}
+
+function addGroup(sel, label, values) {
+  if (!values.length) return;
+  const g = document.createElement("optgroup");
+  g.label = label;
+  addOptions(g, values);
+  sel.appendChild(g);
+}
+
+// Conditions that never reach the reporting threshold in any county go in a
+// second group, so the common ones stay at the top of the list.
+const common = PAYLOAD.conditions.filter(c => !RARE.has(c));
+const rare   = PAYLOAD.conditions.filter(c =>  RARE.has(c));
+
+if (rare.length) {
+  addGroup(conditionSel, "Regularly reported", common);
+  addGroup(conditionSel, "Rarely reported", rare);
+} else {
+  addOptions(conditionSel, PAYLOAD.conditions);
+}
+
+addOptions(countySel, PAYLOAD.counties);
+document.getElementById("footnote").textContent = PAYLOAD.footnote;
+
+// Opening view, before anyone touches the dropdowns.
+function selectIfPresent(sel, value) {
+  if (!value) return;
+  const hit = Array.from(sel.options).find(o => o.value === value);
+  if (hit) sel.value = value;
+}
+selectIfPresent(conditionSel, PAYLOAD.defaultCondition);
+selectIfPresent(countySel, PAYLOAD.defaultCounty);
+
+// Allow ?condition=...&county=... so an ArcGIS Embed widget can drive the view.
+const params = new URLSearchParams(window.location.search);
+[["condition", conditionSel], ["county", countySel]].forEach(([key, sel]) => {
+  const want = params.get(key);
+  if (!want) return;
+  const hit = Array.from(sel.options)
+    .find(o => o.value.toLowerCase() === want.toLowerCase());
+  if (hit) sel.value = hit.value;
+});
+
+function draw() {
+  const condition  = conditionSel.value;
+  const isRare     = RARE.has(condition);
+  const geography  = isRare ? PAYLOAD.districtLabel : countySel.value;
+
+  // A rare condition has no county breakdown to offer.
+  countySel.disabled = isRare;
+  scopeNote.hidden = !isRare;
+  if (isRare) scopeNote.textContent = PAYLOAD.rareNote;
+
+  const years  = PAYLOAD.years;
+  const values = PAYLOAD.series[condition + "||" + geography]
+                 || years.map(() => "0");
+
+  const barX = [], barY = [], barText = [];
+  const supX = [], noneX = [];
+
+  values.forEach((v, i) => {
+    if (v === "<5") {
+      supX.push(years[i]);
+    } else if (Number(v) === 0) {
+      noneX.push(years[i]);
+    } else {
+      barX.push(years[i]);
+      barY.push(Number(v));
+      barText.push("Number of cases: " + v);
+    }
+  });
+
+  const maxVal = barY.length ? Math.max(...barY) : 0;
+  const allSuppressed = barY.length === 0;
+
+  const traces = [
+    {
+      type: "bar", x: barX, y: barY,
+      marker: { color: COL.bar }, width: 0.6,
+      textposition: "none",
+      hovertext: barText,
+      hovertemplate: "%{hovertext}<extra></extra>"
+    },
+    {
+      type: "scatter", mode: "markers+text",
+      x: supX, y: supX.map(() => 0.4),
+      marker: { color: COL.suppressed, size: 9 },
+      text: supX.map(() => "<5"),
+      textposition: "top center",
+      textfont: { color: COL.suppressed, size: 10, family: FONT },
+      hovertemplate:
+        "Fewer than 5 cases reported (count suppressed for privacy)<extra></extra>"
+    },
+    {
+      type: "scatter", mode: "markers",
+      x: noneX, y: noneX.map(() => 0.4),
+      marker: { color: COL.none, size: 9 },
+      hovertemplate: "No cases reported<extra></extra>"
+    }
+  ];
+
+  const layout = {
+    title: {
+      text: "Number of cases reported in " + geography + " for " + condition,
+      font: { size: 13, family: FONT, color: COL.ink },
+      x: 0.02, xanchor: "left"
+    },
+    showlegend: false,
+    paper_bgcolor: "#fff",
+    plot_bgcolor: "#fff",
+    margin: { t: 50, r: 20, l: 60, b: 110 },
+    font: { family: FONT, color: COL.ink },
+    bargap: 0.4,
+    xaxis: {
+      type: "category",
+      categoryorder: "array",
+      categoryarray: years,
+      showgrid: false,
+      tickfont: { size: 11, color: COL.ink },
+      fixedrange: true
+    },
+    yaxis: {
+      title: { text: "Number of cases reported", font: { size: 11 } },
+      range: [0, Math.max(maxVal + 1, 2)],
+      showticklabels: !allSuppressed,
+      showgrid: true,
+      gridcolor: COL.grid,
+      gridwidth: 0.6,
+      tickfont: { size: 11, color: COL.axis },
+      zeroline: false,
+      fixedrange: true
+    },
+    annotations: [
+      {
+        x: 0.49, y: -0.17, xref: "paper", yref: "paper",
+        xanchor: "right", showarrow: false,
+        text: "<b>\u25CF  Fewer than 5 cases (suppressed)</b>",
+        font: { size: 12, color: COL.suppressed, family: FONT }
+      },
+      {
+        x: 0.51, y: -0.17, xref: "paper", yref: "paper",
+        xanchor: "left", showarrow: false,
+        text: "<b>\u25CF  No cases reported</b>",
+        font: { size: 12, color: COL.none, family: FONT }
+      },
+      {
+        x: 0.5, y: -0.26, xref: "paper", yref: "paper",
+        showarrow: false,
+        text: PAYLOAD.footnote,
+        font: { size: 10, color: "#6c7a89", family: FONT }
+      }
+    ]
+  };
+
+  Plotly.react("chart", traces, layout, {
+    displayModeBar: false,
+    responsive: true
+  });
+}
+
+conditionSel.addEventListener("change", draw);
+countySel.addEventListener("change", draw);
+draw();
+</script>
+</body>
+</html>
